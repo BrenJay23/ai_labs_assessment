@@ -17,6 +17,7 @@ dependencies = [
     "matplotlib>=3.10.8",
     "numpy>=2.4.2",
     "openinference-instrumentation-langchain>=0.1.59",
+    "optuna>=4.7.0",
     "pandas>=3.0.1",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
