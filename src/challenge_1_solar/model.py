@@ -33,12 +33,14 @@ def get_feature_vector(
             baseline = city_df[_feature_cols].select_dtypes(include="number").mean()
             for col in CAT_COLS:
                 if col in _feature_cols:
-                    baseline[col] = city_df[col].mode()[0]
+                    mode = city_df[col].mode()
+                    baseline[col] = mode[0] if not mode.empty else "N"
     else:
         baseline = city_df[_feature_cols].select_dtypes(include="number").mean()
         for col in CAT_COLS:
             if col in _feature_cols:
-                baseline[col] = city_df[col].mode()[0]
+                mode = city_df[col].mode()
+                baseline[col] = mode[0] if not mode.empty else "N"
 
     if weather:
         for field, value in weather.items():

@@ -1,7 +1,7 @@
 from typing import Optional
+
 import pandas as pd
 from langchain_core.tools import tool
-from pydantic import BaseModel, Field
 from rapidfuzz import process
 
 from .model import (
@@ -14,103 +14,7 @@ from .model import (
     GCR,
     PANEL_EFFICIENCY,
 )
-
-_stats = _holdout[_feature_cols].describe()
-
-
-def _fdesc(col: str, unit: str) -> str:
-    if col not in _stats:
-        return unit
-    return (
-        f"{unit}. "
-        f"Typical range: {_stats[col]['25%']:.1f}–{_stats[col]['75%']:.1f}, "
-        f"average: {_stats[col]['mean']:.1f}"
-    )
-
-
-class WeatherInput(BaseModel):
-    """Optional weather conditions. Leave fields as None if unknown — missing fields
-    will be filled with historical averages for the city."""
-
-    min_temp: Optional[float] = Field(
-        None, description=_fdesc("MinTemp", "Min temperature (°C)")
-    )
-    max_temp: Optional[float] = Field(
-        None, description=_fdesc("MaxTemp", "Max temperature (°C)")
-    )
-    rainfall: Optional[float] = Field(
-        None, description=_fdesc("Rainfall", "Rainfall (mm)")
-    )
-    evaporation: Optional[float] = Field(
-        None, description=_fdesc("Evaporation", "Evaporation (mm)")
-    )
-    sunshine: Optional[float] = Field(
-        None, description=_fdesc("Sunshine", "Sunshine hours")
-    )
-    wind_gust_speed: Optional[float] = Field(
-        None, description=_fdesc("WindGustSpeed", "Wind gust speed (km/h)")
-    )
-    wind_speed_9am: Optional[float] = Field(
-        None, description=_fdesc("WindSpeed9am", "Wind speed at 9am (km/h)")
-    )
-    wind_speed_3pm: Optional[float] = Field(
-        None, description=_fdesc("WindSpeed3pm", "Wind speed at 3pm (km/h)")
-    )
-    humidity_9am: Optional[float] = Field(
-        None, description=_fdesc("Humidity9am", "Humidity at 9am (%)")
-    )
-    humidity_3pm: Optional[float] = Field(
-        None, description=_fdesc("Humidity3pm", "Humidity at 3pm (%)")
-    )
-    pressure_9am: Optional[float] = Field(
-        None, description=_fdesc("Pressure9am", "Atmospheric pressure at 9am (hPa)")
-    )
-    pressure_3pm: Optional[float] = Field(
-        None, description=_fdesc("Pressure3pm", "Atmospheric pressure at 3pm (hPa)")
-    )
-    cloud_9am: Optional[float] = Field(
-        None,
-        description=_fdesc(
-            "Cloud9am", "Cloud cover at 9am (eighths, 0–8). Clear=0, Overcast=8"
-        ),
-    )
-    cloud_3pm: Optional[float] = Field(
-        None,
-        description=_fdesc(
-            "Cloud3pm", "Cloud cover at 3pm (eighths, 0–8). Clear=0, Overcast=8"
-        ),
-    )
-    temp_9am: Optional[float] = Field(
-        None, description=_fdesc("Temp9am", "Temperature at 9am (°C)")
-    )
-    temp_3pm: Optional[float] = Field(
-        None, description=_fdesc("Temp3pm", "Temperature at 3pm (°C)")
-    )
-    rain_today: Optional[str] = Field(
-        None, description="Whether it is raining today. 'Yes' or 'No'"
-    )
-
-
-def _to_model_dict(w: WeatherInput) -> dict:
-    return {
-        "MinTemp": w.min_temp,
-        "MaxTemp": w.max_temp,
-        "Rainfall": w.rainfall,
-        "Evaporation": w.evaporation,
-        "Sunshine": w.sunshine,
-        "WindGustSpeed": w.wind_gust_speed,
-        "WindSpeed9am": w.wind_speed_9am,
-        "WindSpeed3pm": w.wind_speed_3pm,
-        "Humidity9am": w.humidity_9am,
-        "Humidity3pm": w.humidity_3pm,
-        "Pressure9am": w.pressure_9am,
-        "Pressure3pm": w.pressure_3pm,
-        "Cloud9am": w.cloud_9am,
-        "Cloud3pm": w.cloud_3pm,
-        "Temp9am": w.temp_9am,
-        "Temp3pm": w.temp_3pm,
-        "RainToday": w.rain_today,
-    }
+from .schemas import WeatherInput
 
 
 def _resolve_city(city: str) -> tuple[str, float] | tuple[None, None]:
@@ -158,7 +62,7 @@ def predict_solar_yield(
     if resolved_city is None:
         return {"error": f"City '{city}' not found.", "available_cities": VALID_CITIES}
 
-    weather_dict = _to_model_dict(weather) if weather else None
+    weather_dict = weather.to_model_dict() if weather else None
     pvout = predict_pvout(resolved_city, date, weather_dict)
     result = compute_yield(pvout, farm_area_ha, gcr, panel_efficiency)
 
@@ -186,10 +90,7 @@ def predict_solar_yield(
                 f"Missing weather fields filled with historical average: {missing}"
             )
 
-    assumptions += [
-        f"GCR={gcr}, panel efficiency={panel_efficiency * 100:.0f}%",
-        "Performance ratio already included in GSA PVOUT",
-    ]
+    assumptions.append(f"GCR={gcr}, panel efficiency={panel_efficiency * 100:.0f}%")
 
     return {
         "city": resolved_city,
@@ -205,6 +106,7 @@ def get_city_solar_stats(city: Optional[str] = None) -> dict:
     """
     Get reference solar and weather statistics for an Australian city.
     Call this first if unsure about the exact city name or to discover available cities.
+    Also useful for comparing cities without needing a farm size.
 
     Args:
         city: Australian city name. If None or not found, returns list of available cities.
@@ -222,11 +124,11 @@ def get_city_solar_stats(city: Optional[str] = None) -> dict:
     return {
         "city": resolved_city,
         "gsa_yearly_pvout": _city_pvout.get(resolved_city),
-        "avg_humidity_3pm": avg.get("Humidity3pm"),  # #1 feature importance
-        "avg_temp_9am": avg.get("Temp9am"),  # #2
-        "avg_sunshine_hrs": avg.get("Sunshine"),  # #3 (also most intuitive)
-        "avg_cloud_9am": avg.get("Cloud9am"),  # #4
-        "avg_cloud_3pm": avg.get("Cloud3pm"),  # #5
+        "avg_humidity_3pm": avg.get("Humidity3pm"),
+        "avg_temp_9am": avg.get("Temp9am"),
+        "avg_sunshine_hrs": avg.get("Sunshine"),
+        "avg_cloud_9am": avg.get("Cloud9am"),
+        "avg_cloud_3pm": avg.get("Cloud3pm"),
         "avg_max_temp": avg.get("MaxTemp"),
         "avg_rainfall_mm": avg.get("Rainfall"),
         "data_year": 2010,
