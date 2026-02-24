@@ -29,6 +29,4 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "nbstripout>=0.9.0",
-]
+dev = []
