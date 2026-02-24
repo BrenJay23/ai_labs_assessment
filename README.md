@@ -245,7 +245,7 @@ Can you explain how my daily solar yield is actually calculated?
 
 ### Dataset
 
-[SROIE V2](https://www.kaggle.com/datasets/urbikn/sroie2019-datasetv2) — 973 receipts with ground truth annotations for company, date, address, and total.
+[SROIE V2](https://www.kaggle.com/datasets/urbikn/sroie-datasetv2) — 973 receipts with ground truth annotations for company, date, address, and total.
 
 ---
 
