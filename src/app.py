@@ -4,11 +4,12 @@ load_dotenv()
 
 from pathlib import Path
 import gradio as gr
+from gradio import ChatMessage
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from challenge_2_receipts.graph import run_graph
-from challenge_1_solar.agent import run_agent
+from challenge_1_solar.agent import stream_agent
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
@@ -70,8 +71,7 @@ Question: {message}"""
 
 
 def solar_chat(message, history, thread_id):
-    response = run_agent(message, thread_id=thread_id)
-    yield response
+    yield from stream_agent(message, thread_id=thread_id)
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -89,7 +89,10 @@ with gr.Blocks(title="AI Labs Assessment") as app:
             gr.ChatInterface(
                 fn=solar_chat,
                 additional_inputs=[thread_id_state],
-                chatbot=gr.Chatbot(label="Solar Agent", height=500),
+                chatbot=gr.Chatbot(
+                    label="Solar Agent",
+                    height=600,
+                ),
                 textbox=gr.Textbox(
                     placeholder="e.g. What is the expected yield for a 100ha farm in Sydney tomorrow?",
                     label="Ask a question",
