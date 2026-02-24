@@ -1,3 +1,5 @@
+# src/challenge_1_solar/agent.py
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,6 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain.agents import create_agent
 
 from .tools import predict_solar_yield, get_city_solar_stats
+from .model import GCR, PANEL_EFFICIENCY
 
 tools = [predict_solar_yield, get_city_solar_stats]
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
@@ -33,15 +36,26 @@ You have two tools:
    The tool will use the city's annual historical average as the baseline.
 5. If no city is provided → ask the user for a city before proceeding.
 
+## Yield Formula
+When asked how yield is calculated, explain:
+    Panel area (m²)    = farm_area_ha × 10,000 × GCR
+    Installed kWp      = Panel area × panel_efficiency
+    Daily yield (kWh)  = Installed kWp × PVOUT (kWh/kWp/day)
+
+Where PVOUT (kWh/kWp/day) is predicted by XGBoost from weather features,
+sourced from the Global Solar Atlas yearly raster for each Australian city.
+
 ## Unit Conversion
 Always convert farm area to hectares before calling predict_solar_yield:
 - 1 acre = 0.4047 ha, 1 km² = 100 ha, 1 m² = 0.0001 ha
 
 ## Response Guidelines
 - Always state which fallback strategy was used
-- Always mention key assumptions (GCR=0.35, panel efficiency=18%)
+- Always mention GCR and panel efficiency values used
 - Present results in both kWh/day and MWh/day
-- When weather is inferred from a description, note the prediction is a directional estimate
+- When weather is inferred from a qualitative description, note that the prediction
+  is a directional estimate and not a precise forecast
+- Always show the assumptions list returned by the tool
 """
 
 
