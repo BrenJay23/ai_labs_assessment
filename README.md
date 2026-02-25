@@ -184,8 +184,8 @@ ai_labs_assessment/
 
 - **Target:** PVOUT (kWh/kWp/day) extracted from Global Solar Atlas TIFF via Rasterio
 - **Features:** 22 weather features from Kaggle Australia Daily Weather Data
-- **Training year:** 2009 (16,424 rows, 45 cities)
-- **Holdout year:** 2010 (16,417 rows, 45 cities)
+- **Training year:** 2009
+- **Holdout year:** 2010
 - **Tuning:** Optuna (100 trials, TPESampler)
 
 ### Yield Formula
@@ -252,5 +252,5 @@ Claude (Anthropic) with the Context7 MCP server (for latest documentation lookup
 ## Notes
 
 - GSA PVOUT represents theoretical yield under idealised conditions. Apply a performance ratio of 0.75–0.80 for real-world generation estimates.
-- R² is capped at ~0.58 due to the discrete nature of the PVOUT target (45 unique values across 16,000+ rows). Including city as a feature inflates R² to 0.99 but constitutes data leakage.
+- R² is capped at ~0.58 due to the discrete nature of the PVOUT target (44 unique values across 16,000+ rows). Including city as a feature inflates R² to 0.99 but constitutes data leakage.
 - EasyOCR confidence threshold is set to 0.2 — empirically validated on SROIE receipts. Higher thresholds discard critical entity text.
