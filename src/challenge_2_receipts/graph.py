@@ -1,5 +1,3 @@
-# src/challenge_2_receipts/graph.py
-
 import json
 from pathlib import Path
 from typing import Optional, TypedDict
