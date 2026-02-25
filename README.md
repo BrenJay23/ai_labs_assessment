@@ -188,12 +188,6 @@ ai_labs_assessment/
 - **Holdout year:** 2010 (16,417 rows, 45 cities)
 - **Tuning:** Optuna (100 trials, TPESampler)
 
-| Metric | Baseline | Tuned  |
-| ------ | -------- | ------ |
-| RMSE   | 0.2613   | 0.2546 |
-| MAE    | 0.1962   | 0.1872 |
-| R²     | 0.5617   | 0.5840 |
-
 ### Yield Formula
 
 ```
