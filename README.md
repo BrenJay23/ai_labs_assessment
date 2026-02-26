@@ -37,7 +37,7 @@ Global Solar Atlas TIFF + Kaggle Weather Data
                     ↓
             LangChain ReAct Agent
             ↓                   ↓
-    predict_solar_yield  get_city_solar_stats
+    predict_solar_yield  get_city_weather_stats
                     ↓
               Gradio Chat UI
          (tool call observability)
@@ -164,9 +164,11 @@ ai_labs_assessment/
 │
 └── data/
     ├── processed/
+    │   ├── xgb_model.json              # Trained XGBoost model
+    │   ├── encoders.pkl                # LabelEncoders for categorical features
+    │   ├── feature_cols.pkl            # Ordered feature column list
     │   ├── holdout_weather.csv         # 2010 holdout weather data
-    │   ├── results_checkpoint.json     # OCR evaluation results
-    │   └── xgb_model.json              # Trained XGBoost model
+    │   └── results_checkpoint.json     # OCR evaluation results
     │
     └── raw/
         ├── weatherAUS.csv              # Kaggle Australia Daily Weather Data
@@ -182,8 +184,8 @@ ai_labs_assessment/
 
 ### Model
 
-- **Target:** PVOUT (kWh/kWp/day) extracted from Global Solar Atlas TIFF via Rasterio
-- **Features:** 22 weather features from Kaggle Australia Daily Weather Data
+- **Target:** Monthly PVOUT daily average (kWh/kWp/day) extracted from Global Solar Atlas TIFF via Rasterio
+- **Features:** 20 weather features from Kaggle Australia Daily Weather Data
 - **Training year:** 2009
 - **Holdout year:** 2010
 - **Tuning:** Optuna (100 trials, TPESampler)
@@ -202,7 +204,7 @@ Defaults: GCR=0.35, panel efficiency=18%. Both can be overridden via natural lan
 
 - Date resolution (`"tomorrow"`, `"next Monday"` → YYYY-MM-DD)
 - Qualitative weather inference (`"hot and clear"` → full feature vector)
-- Historical fallback when no date or weather provided
+- Weather baseline fetched dynamically by city, month, or specific date
 - Fuzzy city matching (handles typos and casing)
 - Multi-city comparison
 - Yield formula explanation
@@ -246,11 +248,3 @@ Can you explain how my daily solar yield is actually calculated?
 ## AI Tool Usage
 
 Claude (Anthropic) with the Context7 MCP server (for latest documentation lookup) was used as the primary development assistant — generating code, advising on architecture, and writing documentation. All code was reviewed, integrated, and debugged manually.
-
----
-
-## Notes
-
-- GSA PVOUT represents theoretical yield under idealised conditions. Apply a performance ratio of 0.75–0.80 for real-world generation estimates.
-- R² is capped at ~0.58 due to the discrete nature of the PVOUT target (44 unique values across 16,000+ rows). Including city as a feature inflates R² to 0.99 but constitutes data leakage.
-- EasyOCR confidence threshold is set to 0.2 — empirically validated on SROIE receipts. Higher thresholds discard critical entity text.
