@@ -8,55 +8,43 @@ CAT_COLS = ["WindGustDir", "WindDir9am", "WindDir3pm", "RainToday"]
 GCR = 0.35
 PANEL_EFFICIENCY = 0.18
 
-_model = xgb.XGBRegressor()
-_model.load_model(PROCESSED_DIR / "xgb_model.json")
-_encoders = joblib.load(PROCESSED_DIR / "encoders.pkl")
-_feature_cols = joblib.load(PROCESSED_DIR / "feature_cols.pkl")
-_city_pvout = joblib.load(PROCESSED_DIR / "city_pvout.pkl")
-_holdout = pd.read_csv(PROCESSED_DIR / "holdout_weather.csv", parse_dates=["Date"])
+_MODEL = xgb.XGBRegressor()
+_MODEL.load_model(PROCESSED_DIR / "xgb_model.json")
+_ENCODERS = joblib.load(PROCESSED_DIR / "encoders.pkl")
+FEATURE_COLS = joblib.load(PROCESSED_DIR / "feature_cols.pkl")
+HOLDOUT = pd.read_csv(PROCESSED_DIR / "holdout_weather.csv", parse_dates=["Date"])
 
-VALID_CITIES = sorted(_holdout["Location"].unique().tolist())
+VALID_CITIES = sorted(HOLDOUT["Location"].unique().tolist())
 
 
-def get_feature_vector(
-    city: str, date: str = None, weather: dict = None
-) -> pd.DataFrame:
-    city_df = _holdout[_holdout["Location"] == city]
+def get_weather_from_row(row: pd.Series) -> dict:
+    """Convert a holdout weather row to a weather dict."""
+    return {col: row[col] for col in FEATURE_COLS if col in row.index}
 
-    if date:
-        ref_date = pd.Timestamp(date).replace(year=2010)
-        row = city_df[city_df["Date"] == ref_date]
-        if len(row) > 0:
-            baseline = row[_feature_cols].iloc[0].copy()
-        else:
-            # fallback: numeric mean + categorical mode
-            baseline = city_df[_feature_cols].select_dtypes(include="number").mean()
-            for col in CAT_COLS:
-                if col in _feature_cols:
-                    mode = city_df[col].mode()
-                    baseline[col] = mode[0] if not mode.empty else "N"
-    else:
-        baseline = city_df[_feature_cols].select_dtypes(include="number").mean()
-        for col in CAT_COLS:
-            if col in _feature_cols:
-                mode = city_df[col].mode()
-                baseline[col] = mode[0] if not mode.empty else "N"
 
-    if weather:
-        for field, value in weather.items():
-            if value is not None and field in baseline.index:
-                baseline[field] = value
+def get_weather_from_avg(city_df: pd.DataFrame) -> dict:
+    """Compute average weather conditions for a city DataFrame."""
+    avg = city_df[FEATURE_COLS].mean(numeric_only=True)
+    for col in CAT_COLS:
+        if col in FEATURE_COLS:
+            mode = city_df[col].mode()
+            avg[col] = mode[0] if not mode.empty else "N"
+    return avg.to_dict()
+
+
+def predict_pvout(weather: dict) -> float:
+    """
+    Predict PVOUT (kWh/kWp/day) given explicit weather conditions.
+    Assumes weather dict is complete — fetch baseline from get_city_weather_stats first.
+    """
+    baseline = pd.Series(weather)
 
     for col in CAT_COLS:
         if col in baseline.index and isinstance(baseline[col], str):
-            baseline[col] = _encoders[col].transform([str(baseline[col])])[0]
+            baseline[col] = _ENCODERS[col].transform([str(baseline[col])])[0]
 
-    return pd.DataFrame([baseline])[_feature_cols]
-
-
-def predict_pvout(city: str, date: str = None, weather: dict = None) -> float:
-    X = get_feature_vector(city, date, weather)
-    return float(_model.predict(X)[0])
+    X = pd.DataFrame([baseline])[FEATURE_COLS]
+    return float(_MODEL.predict(X)[0])
 
 
 def compute_yield(
@@ -69,7 +57,7 @@ def compute_yield(
     Yield Formula:
         Panel area (m²)    = farm_area_ha × 10,000 × GCR
         Installed kWp      = Panel area × panel_efficiency
-        Daily yield (kWh)  = Installed kWp × PVOUT (kWh/kWp/day)
+        Daily yield (kWh)  = Installed kWh × PVOUT (kWh/kWp/day)
     """
     panel_area_m2 = farm_area_ha * 10_000 * gcr
     installed_kwp = panel_area_m2 * panel_efficiency

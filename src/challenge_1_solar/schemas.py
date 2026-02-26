@@ -1,11 +1,11 @@
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from .model import _holdout, _feature_cols
+from .model import HOLDOUT, FEATURE_COLS
 
 
 def _fdesc(col: str, unit: str) -> str:
-    stats = _holdout[_feature_cols].describe()
+    stats = HOLDOUT[FEATURE_COLS].describe()
     if col not in stats:
         return unit
     return (
@@ -16,8 +16,7 @@ def _fdesc(col: str, unit: str) -> str:
 
 
 class WeatherInput(BaseModel):
-    """Optional weather conditions. Leave fields as None if unknown — missing fields
-    will be filled with historical averages for the city."""
+    """Weather conditions for solar yield prediction."""
 
     model_config = {"populate_by_name": True}
 
@@ -90,6 +89,15 @@ class WeatherInput(BaseModel):
     )
     temp_3pm: Optional[float] = Field(
         None, alias="Temp3pm", description=_fdesc("Temp3pm", "Temperature at 3pm (°C)")
+    )
+    wind_gust_dir: Optional[str] = Field(
+        None, alias="WindGustDir", description="Wind gust direction (e.g. 'N', 'SW')"
+    )
+    wind_dir_9am: Optional[str] = Field(
+        None, alias="WindDir9am", description="Wind direction at 9am (e.g. 'N', 'SW')"
+    )
+    wind_dir_3pm: Optional[str] = Field(
+        None, alias="WindDir3pm", description="Wind direction at 3pm (e.g. 'N', 'SW')"
     )
     rain_today: Optional[str] = Field(
         None,

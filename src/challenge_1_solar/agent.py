@@ -9,10 +9,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain.agents import create_agent
 import json
 
+from .tools import predict_solar_yield, get_city_weather_stats
 
-from .tools import predict_solar_yield, get_city_solar_stats
-
-tools = [predict_solar_yield, get_city_solar_stats]
+tools = [predict_solar_yield, get_city_weather_stats]
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 checkpointer = MemorySaver()
 
@@ -20,21 +19,30 @@ SYSTEM_PROMPT = """You are a solar yield prediction assistant for Australian sol
 You help users estimate daily solar energy output based on location, farm size, and weather conditions.
 
 You have two tools:
-- predict_solar_yield: predicts daily energy yield for a solar farm
-- get_city_solar_stats: returns reference solar statistics and available cities
+- get_city_weather_stats: fetches weather baseline for a city (yearly, monthly, or specific date)
+- predict_solar_yield: predicts daily energy yield given explicit weather conditions
 
 ## Reasoning Order
 
-1. If you are unsure about a city name → call get_city_solar_stats first to confirm
-2. If the user provides specific weather conditions → infer as many WeatherInput fields
-   as possible from their description using the field descriptions as guides, then call
-   predict_solar_yield with those values. Leave unknown fields as None.
-3. If the user specifies a date or relative date (e.g. 'tomorrow', 'next Monday') →
-   resolve it to YYYY-MM-DD using today's date, then pass it to predict_solar_yield.
-   The tool will map it to the equivalent 2010 historical observation.
-4. If no date or weather is provided → call predict_solar_yield without date or weather.
-   The tool will use the city's annual historical average as the baseline.
-5. If no city is provided → ask the user for a city before proceeding.
+You MUST always call get_city_weather_stats before predict_solar_yield.
+Never call predict_solar_yield without first fetching a weather baseline.
+
+1. If no city is provided → ask the user for a city before proceeding.
+
+2. Fetch weather baseline by calling get_city_weather_stats:
+   - Date provided (e.g. 'July 15', 'tomorrow') → resolve to YYYY-MM-DD, pass as date=
+   - Month provided (e.g. 'in July', 'next month') → pass as month=
+   - No date or month → call with city only (returns yearly average)
+
+3. If the user describes weather qualitatively (e.g. 'hot and clear', 'stormy'):
+   - Use the baseline from get_city_weather_stats as the foundation
+   - Override specific WeatherInput fields consistent with the description
+   - Use meteorological reasoning: a rainy day implies high humidity, heavy cloud,
+     low sunshine, likely rainfall > 0. A clear hot day implies low cloud, high
+     sunshine, low humidity, high max temp.
+   - Override as many fields as the description supports.
+
+4. Call predict_solar_yield with the merged WeatherInput (baseline + overrides).
 
 ## Yield Formula
 When asked how yield is calculated, explain:
@@ -42,27 +50,18 @@ When asked how yield is calculated, explain:
     Installed kWp      = Panel area × panel_efficiency
     Daily yield (kWh)  = Installed kWp × PVOUT (kWh/kWp/day)
 
-Where PVOUT (kWh/kWp/day) is predicted by XGBoost from weather features,
-sourced from the Global Solar Atlas yearly raster for each Australian city.
+Where PVOUT (kWh/kWp/day) is predicted by XGBoost from weather features.
 
 ## Unit Conversion
 Always convert farm area to hectares before calling predict_solar_yield:
 - 1 acre = 0.4047 ha, 1 km² = 100 ha, 1 m² = 0.0001 ha
 
-## Weather Inference from Natural Language
-When the user describes weather qualitatively, think about the physical correlations
-between weather variables and infer ALL fields that are consistent with the description.
-For example, a rainy day implies not just rainfall but also high humidity, heavy cloud
-cover, low sunshine hours and likely no wind. Use your world knowledge of meteorology
-to fill in as many WeatherInput fields as possible before calling the tool.
-
 ## Response Guidelines
-- Always state which fallback strategy was used
+- Always state the weather baseline source (yearly average, monthly average, or specific date)
 - Always mention GCR and panel efficiency values used
 - Present results in both kWh/day and MWh/day
 - When weather is inferred from a qualitative description, note that the prediction
   is a directional estimate and not a precise forecast
-- Always show the assumptions list returned by the tool
 """
 
 
@@ -111,7 +110,6 @@ def stream_agent(question: str, thread_id: str = "default"):
                         if m.metadata and m.metadata.get("id") == msg.tool_call_id:
                             m.metadata["status"] = "done"
 
-                    # Parse content and format as markdown
                     try:
                         data = json.loads(msg.content)
                         content = "\n".join(f"- **{k}:** {v}" for k, v in data.items())
@@ -130,7 +128,7 @@ def stream_agent(question: str, thread_id: str = "default"):
                     )
                     yield messages
 
-                # Final text response — no tool calls
+                # Final text response
                 elif (
                     hasattr(msg, "content")
                     and msg.content
