@@ -82,16 +82,16 @@ def stream_agent(question: str, thread_id: str = "default"):
     config = {"configurable": {"thread_id": thread_id}}
     messages = []
 
-    for event in agent.stream(
+    for chunk in agent.stream(
         {"messages": [{"role": "user", "content": question}]},
         config,
         stream_mode="updates",
     ):
-        for node, update in event.items():
+        for node, update in chunk.items():
             for msg in update.get("messages", []):
 
-                # LLM made tool calls — show as pending accordion
-                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                # Tool call — pending accordion
+                if getattr(msg, "tool_calls", None):
                     for tc in msg.tool_calls:
                         messages.append(
                             ChatMessage(
@@ -104,20 +104,19 @@ def stream_agent(question: str, thread_id: str = "default"):
                                 },
                             )
                         )
-                    yield messages
 
-                # Tool returned a result — mark parent done, show result
-                elif hasattr(msg, "tool_call_id"):
+                # Tool result — close parent, nest result
+                elif getattr(msg, "tool_call_id", None):
                     for m in messages:
                         if m.metadata and m.metadata.get("id") == msg.tool_call_id:
                             m.metadata["status"] = "done"
-
                     try:
-                        data = json.loads(msg.content)
-                        content = "\n".join(f"- **{k}:** {v}" for k, v in data.items())
+                        content = "\n".join(
+                            f"- **{k}:** {v}"
+                            for k, v in json.loads(msg.content).items()
+                        )
                     except (json.JSONDecodeError, AttributeError):
                         content = str(msg.content)
-
                     messages.append(
                         ChatMessage(
                             role="assistant",
@@ -128,18 +127,11 @@ def stream_agent(question: str, thread_id: str = "default"):
                             },
                         )
                     )
-                    yield messages
 
-                # Final text response
-                elif (
-                    hasattr(msg, "content")
-                    and msg.content
-                    and not getattr(msg, "tool_calls", None)
+                # Final response
+                elif getattr(msg, "content", None) and not getattr(
+                    msg, "tool_calls", None
                 ):
-                    messages.append(
-                        ChatMessage(
-                            role="assistant",
-                            content=msg.content,
-                        )
-                    )
-                    yield messages
+                    messages.append(ChatMessage(role="assistant", content=msg.content))
+
+                yield messages
