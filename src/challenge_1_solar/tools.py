@@ -29,8 +29,8 @@ def get_city_weather_stats(
     date: Optional[str] = None,
 ) -> dict:
     """
-    Get weather conditions for an Australian city. Used to fetch a baseline
-    before calling predict_solar_yield, or to answer weather-related questions.
+    Get weather conditions of an Australian city to use as a baseline
+    in predict_solar_yield, or to answer weather-related questions directly.
 
     Priority: date > month > yearly average.
 
@@ -84,9 +84,6 @@ def predict_solar_yield(
     """
     Predict daily solar energy yield for an Australian solar farm.
 
-    Always call get_city_weather_stats first to fetch a baseline weather dict,
-    then override specific fields with the user's described conditions before calling this.
-
     Yield Formula:
         Panel area (m²)    = farm_area_ha × 10,000 × GCR
         Installed kWp      = Panel area × panel_efficiency
@@ -95,9 +92,9 @@ def predict_solar_yield(
     Args:
         city            : Australian city name.
         farm_area_ha    : Farm area in hectares. Convert first if needed:
-                          1 acre=0.4047ha, 1 km²=100ha, 1 m²=0.0001ha
-        weather         : Weather conditions from get_city_weather_stats, with any
-                          user-described overrides applied on top.
+                        1 acre=0.4047ha, 1 km²=100ha, 1 m²=0.0001ha
+        weather         : Weather conditions as WeatherInput. Fetch a baseline from
+                        get_city_weather_stats and apply any user-described overrides.
         gcr             : Ground Coverage Ratio (default 0.35). Typical range: 0.2–0.5.
         panel_efficiency: Solar panel efficiency as decimal (default 0.18 = 18%).
     """

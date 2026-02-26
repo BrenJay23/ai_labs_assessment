@@ -106,4 +106,6 @@ class WeatherInput(BaseModel):
     )
 
     def to_model_dict(self) -> dict:
-        return self.model_dump(by_alias=True)
+        return {
+            k: v for k, v in self.model_dump(by_alias=True).items() if v is not None
+        }

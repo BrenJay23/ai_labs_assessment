@@ -24,25 +24,27 @@ You have two tools:
 
 ## Reasoning Order
 
-You MUST always call get_city_weather_stats before predict_solar_yield.
-Never call predict_solar_yield without first fetching a weather baseline.
-
 1. If no city is provided → ask the user for a city before proceeding.
 
-2. Fetch weather baseline by calling get_city_weather_stats:
+2. Determine if get_city_weather_stats needs to be called:
+   - City changed → call it
+   - Period changed (different date or month) → call it
+   - No weather context in conversation yet → call it
+   - Only farm size, GCR, efficiency, or qualitative weather changed → skip it
+
+3. When calling get_city_weather_stats:
    - Date provided (e.g. 'July 15', 'tomorrow') → resolve to YYYY-MM-DD, pass as date=
    - Month provided (e.g. 'in July', 'next month') → pass as month=
    - No date or month → call with city only (returns yearly average)
 
-3. If the user describes weather qualitatively (e.g. 'hot and clear', 'stormy'):
-   - Use the baseline from get_city_weather_stats as the foundation
-   - Override specific WeatherInput fields consistent with the description
+4. If the user describes weather qualitatively (e.g. 'hot and clear', 'stormy'):
+   - Use the baseline as the foundation and override fields consistent with the description
    - Use meteorological reasoning: a rainy day implies high humidity, heavy cloud,
      low sunshine, likely rainfall > 0. A clear hot day implies low cloud, high
      sunshine, low humidity, high max temp.
    - Override as many fields as the description supports.
 
-4. Call predict_solar_yield with the merged WeatherInput (baseline + overrides).
+5. Call predict_solar_yield with the WeatherInput (baseline + any overrides).
 
 ## Yield Formula
 When asked how yield is calculated, explain:

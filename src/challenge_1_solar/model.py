@@ -18,18 +18,20 @@ VALID_CITIES = sorted(HOLDOUT["Location"].unique().tolist())
 
 
 def get_weather_from_row(row: pd.Series) -> dict:
-    """Convert a holdout weather row to a weather dict."""
-    return {col: row[col] for col in FEATURE_COLS if col in row.index}
+    return {
+        col: (None if pd.isna(row[col]) else row[col])
+        for col in FEATURE_COLS
+        if col in row.index
+    }
 
 
 def get_weather_from_avg(city_df: pd.DataFrame) -> dict:
-    """Compute average weather conditions for a city DataFrame."""
     avg = city_df[FEATURE_COLS].mean(numeric_only=True)
     for col in CAT_COLS:
         if col in FEATURE_COLS:
             mode = city_df[col].mode()
             avg[col] = mode[0] if not mode.empty else "N"
-    return avg.to_dict()
+    return {col: (None if pd.isna(val) else val) for col, val in avg.items()}
 
 
 def predict_pvout(weather: dict) -> float:
@@ -43,7 +45,7 @@ def predict_pvout(weather: dict) -> float:
         if col in baseline.index and isinstance(baseline[col], str):
             baseline[col] = _ENCODERS[col].transform([str(baseline[col])])[0]
 
-    X = pd.DataFrame([baseline])[FEATURE_COLS]
+    X = pd.DataFrame([baseline]).reindex(columns=FEATURE_COLS)
     return float(_MODEL.predict(X)[0])
 
 
