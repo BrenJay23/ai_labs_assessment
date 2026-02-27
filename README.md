@@ -30,17 +30,23 @@ Two end-to-end AI solutions built in Python, served through a unified Gradio web
 ### Challenge 1 — Solar Yield Prediction
 
 ```
-Global Solar Atlas TIFF + Kaggle Weather Data
-                    ↓
-             Rasterio extraction
-            XGBoost (Optuna tuned)
-                    ↓
-            LangChain ReAct Agent
-            ↓                   ↓
-    predict_solar_yield  get_city_weather_stats
-                    ↓
-              Gradio Chat UI
-         (tool call observability)
+Global Solar Atlas Monthly TIFFs      Kaggle Weather Data (AUS)
+                ↓                                ↓
+        Rasterio extraction         Train/holdout split (2009/2010)
+ Monthly PVOUT per city (target)    Aggregate to per city per month
+                             ↓        ↓
+                         XGBoost Regressor
+                  (Optuna hyperparameter tuning)
+                                  ↓
+                            Saved artifacts
+          (xgb_model, encoders, feature_cols, holdout_weather)
+                                  ↓
+              LangChain ReAct Agent (Gemini 2.5 Flash)
+                         ↓                    ↓
+            predict_solar_yield         get_city_weather_stats
+                                  ↓
+                            Gradio Chat UI
+                     (with tool call observability)
 ```
 
 ### Challenge 2 — Receipt Q&A
@@ -185,7 +191,7 @@ ai_labs_assessment/
 ### Model
 
 - **Target:** Monthly PVOUT daily average (kWh/kWp/day) extracted from Global Solar Atlas TIFF via Rasterio
-- **Features:** 20 weather features from Kaggle Australia Daily Weather Data
+- **Features:** 20 weather features from Kaggle Australia Daily Weather Data aggregated by month and city
 - **Training year:** 2009
 - **Holdout year:** 2010
 - **Tuning:** Optuna (100 trials, TPESampler)
